@@ -1,49 +1,24 @@
-import { Analytics } from '@vercel/analytics/next'
-import type { Metadata, Viewport } from 'next'
-import './globals.css'
-
+import type { Metadata, Viewport } from "next";
+import "./globals.css";
 export const metadata: Metadata = {
-  title: 'application-prep — Learn the edges',
-  description: 'Turn any reading into rigorous flashcards and quizzes that test conceptual knowledge, edge cases, and transfer.',
-  generator: 'v0.app',
-  icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/apple-icon.png',
-  },
-}
-
+  title: "application-prep — Learn the edges",
+  description:
+    "Compile course material into source-grounded flashcards, rigorous quizzes, and assessment preparation in one workspace.",
+  icons: { icon: "/favicon.svg" },
+};
 export const viewport: Viewport = {
-  colorScheme: 'light dark',
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: 'white' },
-    { media: '(prefers-color-scheme: dark)', color: 'black' },
-  ],
-}
-
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#f7f6f2",
+};
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode
-}>) {
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en">
-      <body className="antialiased">
-        {children}
-        {process.env.NODE_ENV === 'production' && <Analytics />}
-      </body>
+      <body>{children}</body>
     </html>
-  )
+  );
 }
