@@ -15,8 +15,6 @@ import {
   Upload,
   Trash2,
   RotateCcw,
-  LogIn,
-  Cloud,
   ChevronDown,
   Sparkles,
   Clock,
@@ -40,32 +38,16 @@ import {
 import { generateFromSources } from "@/lib/study/generator";
 import { demoSet } from "@/lib/study/demo";
 const DRAFT_KEY = "application-prep-recovery-v1";
-type Status = {
-  userKey: string;
-  signedIn: boolean;
-  name: string | null;
-  ai: boolean;
-  storage: boolean;
-};
 export default function WorkspaceApp() {
   const [view, setView] = useState<"create" | "library" | "progress">("create"),
-    [workspace, setWorkspace] = useState<Workspace>(emptyWorkspace),
-    [revision, setRevision] = useState(0),
-    [status, setStatus] = useState<Status>({
-      userKey: "local",
-      signedIn: false,
-      name: null,
-      ai: false,
-      storage: false,
-    });
+    [workspace, setWorkspace] = useState<Workspace>(emptyWorkspace);
   const [sourceBusy, setSourceBusy] = useState(false);
   const [loading, setLoading] = useState(true),
     [ready, setReady] = useState(false),
     [saving, setSaving] = useState(false),
     [unsaved, setUnsaved] = useState(false),
     [error, setError] = useState(""),
-    [notice, setNotice] = useState(""),
-    [recovery, setRecovery] = useState<Workspace | null>(null);
+    [notice, setNotice] = useState("");
   const [course, setCourse] = useState(""),
     [title, setTitle] = useState(""),
     [scope, setScope] = useState(""),
@@ -73,55 +55,30 @@ export default function WorkspaceApp() {
     [level, setLevel] = useState(3),
     [count, setCount] = useState(12),
     [sources, setSources] = useState<Source[]>([]),
-    [useAI, setUseAI] = useState(false),
     [generating, setGenerating] = useState(false);
   const [query, setQuery] = useState(""),
     [courseFilter, setCourseFilter] = useState("all"),
     [activeSet, setActiveSet] = useState<StudySet | null>(null);
   const stateRef = useRef(workspace),
-    revisionRef = useRef(revision),
     lock = useRef(false),
     importInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
     stateRef.current = workspace;
   }, [workspace]);
-  useEffect(() => {
-    revisionRef.current = revision;
-  }, [revision]);
   const load = async () => {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/status");
-      if (!response.ok) throw new Error("Could not connect to the workspace.");
-      const s: Status = await response.json();
-      setStatus(s);
-      setUseAI(s.ai);
-      if (s.signedIn) {
-        const r = await fetch("/api/workspace");
-        const d: { error?: string; workspace: unknown; revision: number } =
-          await r.json();
-        if (!r.ok) throw new Error(d.error);
-        const ws = workspaceSchema.parse(d.workspace);
-        stateRef.current = ws;
-        setWorkspace(ws);
-        setRevision(d.revision);
-        revisionRef.current = d.revision;
-      }
+      const saved = localStorage.getItem(DRAFT_KEY + ":local");
+      const ws = saved ? workspaceSchema.parse(JSON.parse(saved)) : emptyWorkspace();
+      stateRef.current = ws;
+      setWorkspace(ws);
       setReady(true);
       setUnsaved(false);
-      try {
-        const draft = localStorage.getItem(DRAFT_KEY + ":" + s.userKey);
-        if (draft) setRecovery(workspaceSchema.parse(JSON.parse(draft)));
-      } catch {
-        setRecovery(null);
-      }
-    } catch (e) {
-      setError((e as Error).message);
+    } catch {
+      setError("Saved data could not be read. Export your current work before clearing browser storage.");
       setReady(false);
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
   useEffect(() => {
     void load();
@@ -135,54 +92,22 @@ export default function WorkspaceApp() {
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [unsaved]);
-  const retain = (ws: Workspace) => {
-    try {
-      localStorage.setItem(
-        DRAFT_KEY + ":" + status.userKey,
-        JSON.stringify(ws),
-      );
-    } catch {
-      setNotice(
-        "Recovery storage is full. Export your workspace to protect unsaved work.",
-      );
-    }
-  };
   const persist = async (ws: Workspace) => {
+    if (!ready) throw new Error("Load your workspace before saving.");
     if (lock.current) throw new Error("A save is already in progress.");
+    lock.current = true;
+    setSaving(true);
     stateRef.current = ws;
     setWorkspace(ws);
     setUnsaved(true);
-    retain(ws);
-    if (!status.signedIn) {
-      setNotice(
-        "This is a local session. Sign in for saved progress across devices, or export your workspace.",
-      );
-      return;
-    }
-    if (!ready)
-      throw new Error("Load your workspace successfully before saving.");
-    lock.current = true;
-    setSaving(true);
     try {
-      const r = await fetch("/api/workspace", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workspace: ws, revision: revisionRef.current }),
-      });
-      const data: { error?: string; revision: number } = await r.json();
-      if (!r.ok) throw new Error(data.error);
-      revisionRef.current = data.revision;
-      setRevision(data.revision);
+      localStorage.setItem(DRAFT_KEY + ":local", JSON.stringify(ws));
       setUnsaved(false);
-      setRecovery(null);
-      localStorage.removeItem(DRAFT_KEY + ":" + status.userKey);
-    } catch (e) {
-      setError((e as Error).message);
-      throw e;
-    } finally {
-      lock.current = false;
-      setSaving(false);
-    }
+    } catch {
+      const message = "Browser storage is full or unavailable. Export your workspace to protect your work.";
+      setError(message);
+      throw new Error(message);
+    } finally { lock.current = false; setSaving(false); }
   };
   const input = (): GenerationInput =>
     generationSchema.parse({
@@ -193,7 +118,7 @@ export default function WorkspaceApp() {
       level,
       count,
       sources,
-      useAI,
+      useAI: false,
     });
   const create = async () => {
     setError("");
@@ -210,19 +135,7 @@ export default function WorkspaceApp() {
         );
       if (length < 100)
         throw new Error("Select at least 100 characters of readable material.");
-      let set: StudySet;
-      if (status.signedIn) {
-        const r = await fetch("/api/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data),
-        });
-        const result: { error?: string; set: StudySet } = await r.json();
-        if (!r.ok) throw new Error(result.error);
-        set = result.set;
-      } else {
-        set = generateFromSources(data);
-      }
+      const set = generateFromSources(data);
       await persist({
         ...stateRef.current,
         sets: [set, ...stateRef.current.sets],
@@ -317,28 +230,6 @@ export default function WorkspaceApp() {
       });
     } catch {}
   };
-  const recover = async () => {
-    if (!recovery) return;
-    const existing = stateRef.current;
-    const ids = new Set(existing.sets.map((s) => s.id));
-    const combined = {
-      sets: [...recovery.sets.filter((s) => !ids.has(s.id)), ...existing.sets],
-      attempts: [
-        ...existing.attempts,
-        ...recovery.attempts.filter(
-          (a) =>
-            !existing.attempts.some(
-              (x) => JSON.stringify(x) === JSON.stringify(a),
-            ),
-        ),
-      ].sort((a, b) => Date.parse(a.at) - Date.parse(b.at)),
-    };
-    try {
-      await persist(workspaceSchema.parse(combined));
-      setRecovery(null);
-      setNotice("Recovered local work.");
-    } catch {}
-  };
   const filtered = workspace.sets.filter(
     (s) =>
       (courseFilter === "all" || s.course === courseFilter) &&
@@ -409,7 +300,7 @@ export default function WorkspaceApp() {
             <span
               className={
                 "status-dot " +
-                (unsaved ? "pending" : status.signedIn ? "online" : "")
+                (unsaved ? "pending" : ready ? "online" : "")
               }
             />
             <span>
@@ -419,20 +310,9 @@ export default function WorkspaceApp() {
                   ? "Saving…"
                   : unsaved
                     ? "Unsaved changes"
-                    : status.signedIn
-                      ? "Synced workspace"
-                      : "Local session"}
+                    : "Saved on this device"}
             </span>
-            {!status.signedIn && !loading && (
-              <a
-                className="text-button"
-                href="/signin-with-chatgpt?return_to=%2F"
-                target="_top"
-              >
-                <LogIn size={14} />
-                Sign in
-              </a>
-            )}
+
           </div>
         </div>
       </header>
@@ -444,28 +324,12 @@ export default function WorkspaceApp() {
               <div className="row">
                 {unsaved && (
                   <button className="text-button" onClick={exportData}>
-                    Export recovery
-                  </button>
-                )}
-                {unsaved && status.signedIn && (
-                  <button
-                    className="text-button"
-                    disabled={saving}
-                    onClick={() => {
-                      if (
-                        window.confirm(
-                          "Reload saved data? Your unsaved copy is kept for recovery.",
-                        )
-                      )
-                        void load();
-                    }}
-                  >
-                    Reload saved workspace
+                    Export unsaved work
                   </button>
                 )}
                 {!ready && (
                   <button className="text-button" onClick={load}>
-                    Retry connection
+                    Retry loading
                   </button>
                 )}
                 <button className="text-button" onClick={() => setError("")}>
@@ -479,20 +343,6 @@ export default function WorkspaceApp() {
               <span>{notice}</span>
               <button className="text-button" onClick={() => setNotice("")}>
                 Dismiss
-              </button>
-            </div>
-          )}
-          {recovery && (
-            <div className="banner">
-              <span>
-                A recovery copy has unsaved work from an earlier session.
-              </span>
-              <button
-                className="text-button"
-                disabled={blocked}
-                onClick={recover}
-              >
-                Recover work
               </button>
             </div>
           )}
@@ -520,7 +370,7 @@ export default function WorkspaceApp() {
                     Depth over trivia
                   </span>
                   <span>
-                    <Cloud size={14} />
+                    <Layers3 size={14} />
                     Across your devices
                   </span>
                 </div>
@@ -571,7 +421,6 @@ export default function WorkspaceApp() {
                 sources={sources}
                 onChange={setSources}
                 onBusy={setSourceBusy}
-                signedIn={status.signedIn}
                 disabled={blocked}
               />
               <section className="panel challenge-panel">
@@ -625,26 +474,9 @@ export default function WorkspaceApp() {
                         ))}
                       </select>
                     </label>
-                    <label className="field">
-                      Generation
-                      <select
-                        value={useAI ? "ai" : "source"}
-                        disabled={blocked || !status.ai}
-                        onChange={(e) => setUseAI(e.target.value === "ai")}
-                      >
-                        <option value="source">Source-based exercises</option>
-                        {status.ai && (
-                          <option value="ai">AI · worked answers</option>
-                        )}
-                      </select>
-                    </label>
+                    <div className="field">Generation<span className="small muted">Source-based exercises</span></div>
                   </div>
-                  <p className="small muted">
-                    {useAI
-                      ? "Creates worked answers and scenario questions; source quotes are verified before saving. Review generated answers for accuracy."
-                      : "Creates retrieval cards and reasoning prompts from your exact text. Written reasoning is self-assessed against a rubric. AI generation is " +
-                        (status.ai ? "available above." : "not connected yet.")}
-                  </p>
+                  <p className="small muted">Creates retrieval cards and reasoning prompts from your exact text. Written reasoning is self-assessed against a rubric. AI generation is not connected.</p>
                 </div>
                 <div className="panel-foot">
                   <p className="small muted">
@@ -860,7 +692,7 @@ export default function WorkspaceApp() {
                   <Upload size={15} />
                   Import backup
                 </button>
-                {unsaved && status.signedIn && (
+                {unsaved && (
                   <button
                     className="text-button"
                     disabled={saving}
@@ -868,7 +700,7 @@ export default function WorkspaceApp() {
                       void persist(stateRef.current).catch(() => {});
                     }}
                   >
-                    <Cloud size={15} />
+                    <Layers3 size={15} />
                     Retry save
                   </button>
                 )}
@@ -930,27 +762,9 @@ export default function WorkspaceApp() {
             </div>
             <div className="sidebar-status">
               <p className="eyebrow muted">Workspace status</p>
-              <p>
-                <Cloud size={15} />
-                {status.signedIn
-                  ? "Saved under your sign-in"
-                  : "Sign in for cross-device saving"}
-              </p>
-              <p>
-                <Sparkles size={15} />
-                {status.ai
-                  ? "AI generation connected"
-                  : "Source-based mode ready"}
-              </p>
-              {status.signedIn && (
-                <a
-                  href="/signout-with-chatgpt?return_to=%2F"
-                  target="_top"
-                  className="small text-button"
-                >
-                  Sign out
-                </a>
-              )}
+              <p><Layers3 size={15} /> Saved on this device</p>
+              <p><Sparkles size={15} /> Source-based mode ready</p>
+              <p className="small muted">Export and import a backup to continue on another device.</p>
             </div>
             <p className="sidebar-note">
               Keep official course material as your authority. Source quotes

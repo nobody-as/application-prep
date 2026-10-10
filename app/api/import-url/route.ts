@@ -1,8 +1,8 @@
-import { identity, fail, jsonBody, HttpError } from "@/lib/study/server";
+import { checkOrigin, fail, jsonBody, HttpError } from "@/lib/study/server";
 import { publicUrl, resolvePublicHost } from "@/lib/study/url";
 export async function POST(request: Request) {
   try {
-    await identity(request);
+    checkOrigin(request);
     const body = await jsonBody(request, 5000);
     let url = publicUrl(String(body.url || ""));
     for (let i = 0; i < 4; i++) {

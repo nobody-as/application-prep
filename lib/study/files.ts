@@ -9,8 +9,7 @@ export async function readSourceFile(
   if (file.name.toLowerCase().endsWith(".pdf")) {
     onProgress("Opening PDF…");
     const pdfjs = await import("pdfjs-dist");
-    const worker = await import("pdfjs-dist/build/pdf.worker.min.mjs?url");
-    pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
+    pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
     const task = pdfjs.getDocument({
       data: new Uint8Array(await file.arrayBuffer()),
     });

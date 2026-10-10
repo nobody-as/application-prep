@@ -6,13 +6,11 @@ import { readSourceFile } from "@/lib/study/files";
 export default function SourcePanel({
   sources,
   onChange,
-  signedIn,
   disabled,
   onBusy,
 }: {
   sources: Source[];
   onChange: (s: Source[]) => void;
-  signedIn: boolean;
   disabled: boolean;
   onBusy: (value: boolean) => void;
 }) {
@@ -234,16 +232,13 @@ export default function SourcePanel({
               </p>
               <button
                 className="button secondary small-button"
-                disabled={!signedIn || disabled || !!busy || !url.trim()}
+                disabled={disabled || !!busy || !url.trim()}
                 onClick={importUrl}
               >
                 <Link2 size={14} />
                 Read page
               </button>
             </div>
-            {!signedIn && (
-              <p className="small muted">Sign in to import web pages.</p>
-            )}
           </>
         )}
         {busy && (

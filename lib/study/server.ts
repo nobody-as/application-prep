@@ -1,14 +1,7 @@
-import { getChatGPTUser } from "@/app/chatgpt-auth";
-export async function identity(request: Request) {
-  const user = await getChatGPTUser();
-  if (!user)
-    throw new HttpError(401, "Sign in to save and generate study sets.");
-  if (request.method !== "GET") {
-    const origin = request.headers.get("origin");
-    if (origin && origin !== new URL(request.url).origin)
-      throw new HttpError(403, "Request origin was rejected.");
-  }
-  return user;
+export function checkOrigin(request: Request) {
+  const origin = request.headers.get("origin");
+  if (origin && origin !== new URL(request.url).origin)
+    throw new HttpError(403, "Request origin was rejected.");
 }
 export class HttpError extends Error {
   constructor(
