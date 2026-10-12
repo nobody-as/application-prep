@@ -4,7 +4,11 @@ application-prep is an AI-built study application created from a student's need 
 
 The goal is to bring preparation for a course or assessment into one environment that works across devices. Difficulty is selectable, with maximum conceptual depth and edge-case reasoning as the default.
 
-**Built with AI** describes how the application was developed. The current release creates source-based exercises; AI-powered question generation is not connected yet.
+## AI authorship and privacy
+
+This project was **created and developed with AI assistance**, directed by a student-defined need for a lower-friction way to prepare from course material. It is published as a general-purpose student tool rather than as a record of any individual student, institution, course, or assessment.
+
+The current release creates source-based exercises; AI-powered question generation is not connected yet. Uploaded PDFs/TXT/Markdown are read in the browser, study sets and progress are stored in the browser's local storage, and no account system or automatic cloud sync is configured. Public URL import sends only the requested public URL through the application's import endpoint so the page can be retrieved.
 
 [Open the application](https://application-prep.vercel.app)
 
