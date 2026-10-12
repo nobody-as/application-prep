@@ -382,7 +382,7 @@ export default function WorkspaceApp() {
                     value={course}
                     maxLength={100}
                     onChange={(e) => setCourse(e.target.value)}
-                    placeholder="PHIL 1290"
+                    placeholder="COURSE 101"
                     disabled={blocked}
                   />
                 </label>
