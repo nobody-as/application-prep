@@ -33,7 +33,7 @@ export function demoSet(): StudySet {
   );
   return {
     id: crypto.randomUUID(),
-    course: "PHIL 1290 · Demo",
+    course: "DEMO 101 · Critical Thinking",
     title: "Arguments, explanations & validity",
     scope: "Identify arguments and test conceptual boundaries.",
     due: "",
