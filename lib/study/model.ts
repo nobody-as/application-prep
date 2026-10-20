@@ -7,13 +7,13 @@ export const levels = [
 ] as const;
 export const pageSchema = z.object({
   number: z.number().int().min(1),
-  text: z.string().max(60000),
+  text: z.string(),
 });
 export const sourceSchema = z.object({
   id: z.string().min(1).max(100),
-  title: z.string().min(1).max(200),
-  pages: z.array(pageSchema).min(1).max(300),
-  range: z.string().max(300),
+  title: z.string().min(1),
+  pages: z.array(pageSchema).min(1),
+  range: z.string(),
   use: z.enum(["both", "cards", "quiz"]),
   url: z.string().max(2000).optional(),
 });
@@ -64,7 +64,7 @@ export const setSchema = z.object({
   level: z.number().int().min(0).max(3),
   createdAt: z.string(),
   mode: z.enum(["source", "ai", "demo"]),
-  sources: z.array(sourceSchema).max(12),
+  sources: z.array(sourceSchema),
   cards: z.array(cardSchema).max(100),
   questions: z.array(questionSchema).max(100),
 });
@@ -92,7 +92,7 @@ export const generationSchema = z.object({
   due: z.string().max(20),
   level: z.number().int().min(0).max(3),
   count: z.number().int().min(4).max(40),
-  sources: z.array(sourceSchema).min(1).max(12),
+  sources: z.array(sourceSchema).min(1),
   useAI: z.boolean().default(false),
 });
 export type Source = z.infer<typeof sourceSchema>;
@@ -120,6 +120,7 @@ export function parseRange(range: string, max: number): number[] {
   return [...pages].sort((a, b) => a - b);
 }
 export function selectedPages(s: Source) {
+  if (!s.range.trim()) return s.pages.filter((p) => p.text.trim());
   const allowed = new Set(
     parseRange(s.range, Math.max(...s.pages.map((p) => p.number))),
   );
