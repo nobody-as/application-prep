@@ -22,32 +22,44 @@ export function concepts(text: string) {
     ),
   ];
 }
+function pageClaims(
+  sourceId: string,
+  page: { number: number; text: string },
+  maxItems: number,
+) {
+  const result: { citation: Citation; topic: string }[] = [];
+  const sentence = /[^.!?]+[.!?]+|[^.!?]+$/g;
+  const text = normalize(page.text);
+  let match: RegExpExecArray | null;
+  while (result.length < maxItems && (match = sentence.exec(text))) {
+    const claim = normalize(match[0]);
+    if (
+      claim.length >= 45 &&
+      claim.length <= 900 &&
+      concepts(claim).length >= 2
+    )
+      result.push({
+        citation: { sourceId, page: page.number, quote: claim },
+        topic: concepts(claim).slice(0, 3).join(" / "),
+      });
+  }
+  return result;
+}
 function claims(input: GenerationInput, kind: "cards" | "quiz") {
   const result: { citation: Citation; topic: string }[] = [];
   const seen = new Set<string>();
-  // Round-robin pages prevents early chapters monopolizing a set.
   const buckets = input.sources
     .filter((s) => s.use === "both" || s.use === kind)
     .flatMap((s) =>
-      selectedPages(s).map((p) => {
-        const units = normalize(p.text).match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [];
-        return units
-          .map((t) => normalize(t))
-          .filter(
-            (t) => t.length >= 45 && t.length <= 900 && concepts(t).length >= 2,
-          )
-          .map((t) => ({
-            citation: { sourceId: s.id, page: p.number, quote: t },
-            topic: concepts(t).slice(0, 3).join(" / "),
-          }));
-      }),
+      selectedPages(s).map((p) => pageClaims(s.id, p, input.count)),
     );
   const max = Math.max(0, ...buckets.map((b) => b.length));
-  for (let i = 0; i < max; i++)
+  outer: for (let i = 0; i < max; i++)
     for (const bucket of buckets)
       if (bucket[i] && !seen.has(bucket[i].citation.quote)) {
         seen.add(bucket[i].citation.quote);
         result.push(bucket[i]);
+        if (result.length >= input.count) break outer;
       }
   return result;
 }
@@ -83,6 +95,37 @@ function reasoning(quote: string, level: number, i: number) {
   ];
   return variants[level === 1 ? 0 : level === 2 ? i % 2 : i % 3];
 }
+function compactSources(
+  input: GenerationInput,
+  items: Array<Card | Question>,
+) {
+  const used = new Map<string, Map<number, Set<string>>>();
+  for (const item of items)
+    for (const citation of item.citations) {
+      if (!used.has(citation.sourceId))
+        used.set(citation.sourceId, new Map());
+      const pages = used.get(citation.sourceId)!;
+      if (!pages.has(citation.page)) pages.set(citation.page, new Set());
+      pages.get(citation.page)!.add(citation.quote);
+    }
+  return input.sources.flatMap((source) => {
+    const pages = used.get(source.id);
+    if (!pages) return [];
+    return [
+      {
+        ...source,
+        range: "",
+        pages: [...pages.entries()]
+          .sort(([a], [b]) => a - b)
+          .map(([number, quotes]) => ({
+            number,
+            text: [...quotes].join("\n\n"),
+          })),
+      },
+    ];
+  });
+}
+
 export function generateFromSources(input: GenerationInput): StudySet {
   const forCards = claims(input, "cards"),
     forQuiz = claims(input, "quiz");
@@ -173,7 +216,7 @@ export function generateFromSources(input: GenerationInput): StudySet {
       citations: [c.citation],
     };
   });
-  return verifyCitations({
+  const set: StudySet = {
     id: crypto.randomUUID(),
     course: input.course,
     title: input.title,
@@ -185,5 +228,10 @@ export function generateFromSources(input: GenerationInput): StudySet {
     sources: input.sources,
     cards,
     questions,
+  };
+  verifyCitations(set);
+  return verifyCitations({
+    ...set,
+    sources: compactSources(input, [...cards, ...questions]),
   });
 }
