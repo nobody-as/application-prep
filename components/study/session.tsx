@@ -309,7 +309,7 @@ export default function Session({
                       : s.use === "cards"
                         ? "Flashcards only"
                         : "Quiz only"}{" "}
-                    · Selected pages: {s.range || "all"}
+                    · Evidence pages: {s.pages.map((p) => p.number).join(", ")}
                   </p>
                   {s.url && (
                     <a href={s.url} target="_blank" rel="noreferrer">
