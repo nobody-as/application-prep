@@ -126,15 +126,11 @@ export default function WorkspaceApp() {
     setGenerating(true);
     try {
       const data = input();
-      const length = data.sources
-        .flatMap(selectedPages)
-        .reduce((n, p) => n + p.text.length, 0);
-      if (length > 100000)
-        throw new Error(
-          "Select fewer pages. Each generation pass supports up to 100,000 characters.",
-        );
-      if (length < 100)
-        throw new Error("Select at least 100 characters of readable material.");
+      const hasMaterial = data.sources.some((source) =>
+        selectedPages(source).some((page) => page.text.trim().length >= 30),
+      );
+      if (!hasMaterial)
+        throw new Error("Select readable study material before generating.");
       const set = generateFromSources(data);
       await persist({
         ...stateRef.current,
@@ -188,8 +184,6 @@ export default function WorkspaceApp() {
     if (!file) return;
     setError("");
     try {
-      if (file.size > 4_000_000)
-        throw new Error("Choose a workspace backup under 4 MB.");
       const data = JSON.parse(await file.text());
       const incoming = workspaceSchema.parse(data.workspace || data);
       const existing = stateRef.current;
