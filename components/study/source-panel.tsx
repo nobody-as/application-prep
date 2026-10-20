@@ -2,7 +2,24 @@
 import { useState, useRef } from "react";
 import { Upload, Plus, FileText, X, Link2, ChevronDown } from "lucide-react";
 import { type Source, selectedPages } from "@/lib/study/model";
-import { readSourceFile } from "@/lib/study/files";
+import { readSourceFile, textToPages } from "@/lib/study/files";
+function SourcePreview({ source }: { source: Source }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <details onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary className="small">
+        Inspect extracted text <ChevronDown size={12} />
+      </summary>
+      {open && (
+        <pre className="source-preview">
+          {source.pages
+            .map((page) => "PAGE " + page.number + "\n" + page.text)
+            .join("\n\n")}
+        </pre>
+      )}
+    </details>
+  );
+}
 export default function SourcePanel({
   sources,
   onChange,
@@ -22,8 +39,6 @@ export default function SourcePanel({
     [error, setError] = useState("");
   const input = useRef<HTMLInputElement>(null);
   const add = (s: Source) => {
-    if (sources.length >= 12)
-      throw new Error("A set supports up to 12 sources.");
     onChange([...sources, s]);
     setText("");
     setTitle("");
@@ -39,8 +54,6 @@ export default function SourcePanel({
       for (const file of Array.from(files)) {
         added.push(await readSourceFile(file, setBusy));
       }
-      if (sources.length + added.length > 12)
-        throw new Error("A set supports up to 12 sources.");
       onChange([...sources, ...added]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not read the file.");
@@ -55,12 +68,10 @@ export default function SourcePanel({
     try {
       if (text.trim().length < 100)
         throw new Error("Paste at least 100 characters of study material.");
-      if (text.length > 1500000)
-        throw new Error("Split this material into smaller passages.");
       add({
         id: crypto.randomUUID(),
         title: title.trim() || "Pasted notes",
-        pages: text.split("\f").map((text, i) => ({ number: i + 1, text })),
+        pages: textToPages(text),
         range: "",
         use: "both",
       });
@@ -188,7 +199,6 @@ export default function SourcePanel({
             <input
               ref={input}
               type="file"
-              accept=".pdf,.txt,.md"
               multiple
               hidden
               onChange={(e) => upload(e.target.files)}
@@ -205,12 +215,15 @@ export default function SourcePanel({
             >
               <Upload size={24} />
               <strong>Add your course material</strong>
-              <span>Choose or drop PDF, TXT, and Markdown files</span>
-              <small>20 MB per file · Select specific PDF pages below</small>
+              <span>Choose or drop any file type</span>
+              <small>No app-defined file-size, page-count, or source-count cap</small>
             </button>
             <p className="small muted">
-              Text is extracted on your device. Scanned PDFs require OCR;
-              diagrams and images are not extracted.
+              Files are processed on your device. PDF, Office/OpenDocument,
+              ebooks, archives, markup, code/data, and text formats are read
+              directly; image OCR is used when the browser provides it. Very
+              large files are constrained only by available device/browser
+              resources.
             </p>
           </>
         )}
@@ -323,16 +336,7 @@ export default function SourcePanel({
                     {rangeError ||
                       `${count} readable page${count === 1 ? "" : "s"} selected`}
                   </p>
-                  <details>
-                    <summary className="small">
-                      Inspect extracted text <ChevronDown size={12} />
-                    </summary>
-                    <pre className="source-preview">
-                      {s.pages
-                        .map((p) => `PAGE ${p.number}\n${p.text}`)
-                        .join("\n\n")}
-                    </pre>
-                  </details>
+                  <SourcePreview source={s} />
                 </div>
               );
             })}
